@@ -5,8 +5,6 @@ import (
 	"github.com/Stantheman/pstree"
 )
 
-const IndentDepth = 0
-
 func main() {
 	tree := make(pstree.ProcessTree)
 
