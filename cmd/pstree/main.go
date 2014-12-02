@@ -15,5 +15,5 @@ func main() {
 		return
 	}
 
-	tree.PrintDepthFirst("0", IndentDepth)
+	fmt.Print(tree)
 }
