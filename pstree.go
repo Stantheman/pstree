@@ -1,3 +1,4 @@
+// Package pstree defines processes and process trees, with the ability to populate them
 package pstree
 
 import (
@@ -9,7 +10,7 @@ import (
 	"regexp"
 )
 
-// PIDs are strings -- we don't do math and creation/consumption are guarded with digit globs and digit regexes.
+// ProcessIDs are strings. We don't do math and creation/consumption are guarded with digit globs and digit regexes.
 type ProcessID string
 
 // A Process knows itself, its parent, and who its children are.
@@ -23,42 +24,9 @@ type Process struct {
 // ProcessTree is just a convenient world-view of all processes
 type ProcessTree map[ProcessID]*Process
 
-func (processes ProcessTree) Populate() error {
-	matches, err := filepath.Glob("/proc/[0-9]*")
-	if err != nil {
-		return err
-	}
-
-	for _, pidpath := range matches {
-		pid := ProcessID(filepath.Base(pidpath))
-
-		processes[pid] = new(Process)
-		if err := processes[pid].ReadProcessInfo(pid); err != nil {
-			return err
-		}
-	}
-
-	// cheat and create pid 0 since /proc doesn't expose it, but processes have parents that are pid 0
-	processes["0"] = &Process{"sched", "0", "", nil}
-
-	// now that we have the list of pids, populate the child list
-	for pid, info := range processes {
-		if pid == "0" {
-			continue
-		}
-		processes[info.parent].children = append(processes[info.parent].children, pid)
-	}
-
-	return nil
-}
-
-func (pids ProcessTree) PrintDepthFirst(pid ProcessID, depth int) {
-	fmt.Printf("%*s%v (%v)\n", depth, "", pids[pid].name, pid)
-	for _, kid := range pids[pid].children {
-		pids.PrintDepthFirst(kid, depth+1)
-	}
-}
-
+// ReadProcessInfo parses the /proc/pid/stat file to fill the struct.
+// /proc/pid/stat does not contain information about children -- only parents.
+// Linking children to parents is done in a later pass when we know about every process.
 func (proc *Process) ReadProcessInfo(pid ProcessID) (err error) {
 	fh, err := os.Open("/proc/" + string(pid) + "/stat")
 	if err != nil {
@@ -89,4 +57,44 @@ func (proc *Process) ReadProcessInfo(pid ProcessID) (err error) {
 	proc.parent = ProcessID(matches[2])
 
 	return nil
+}
+
+// Populate reads the entries in /proc and then assembles the list of children.
+// In order to link parents to children, we must first know every processes's parent.
+func (processes ProcessTree) Populate() error {
+	matches, err := filepath.Glob("/proc/[0-9]*")
+	if err != nil {
+		return err
+	}
+
+	for _, pidpath := range matches {
+		pid := ProcessID(filepath.Base(pidpath))
+
+		processes[pid] = new(Process)
+		if err := processes[pid].ReadProcessInfo(pid); err != nil {
+			return err
+		}
+	}
+
+	// cheat and create pid 0 since /proc doesn't expose it, but processes have parents that are pid 0
+	processes["0"] = &Process{"sched", "0", "", nil}
+
+	// now that we have the list of pids, populate the child list
+	for pid, info := range processes {
+		if pid == "0" {
+			continue
+		}
+		processes[info.parent].children = append(processes[info.parent].children, pid)
+	}
+
+	return nil
+}
+
+// PrintDepthFirst traverses the hash and recursively prints a parent's children.
+// BUG(sps): PrintDepthFirst shouldn't print directly.
+func (pids ProcessTree) PrintDepthFirst(pid ProcessID, depth int) {
+	fmt.Printf("%*s%v (%v)\n", depth, "", pids[pid].name, pid)
+	for _, kid := range pids[pid].children {
+		pids.PrintDepthFirst(kid, depth+1)
+	}
 }
