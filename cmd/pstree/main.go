@@ -9,7 +9,7 @@ func main() {
 	tree := make(pstree.ProcessTree)
 
 	if err := tree.Populate(); err != nil {
-		fmt.Errorf("Failed getting proceses: %v\n", err)
+		fmt.Printf("Failed getting proceses: %v\n", err)
 		return
 	}
 
