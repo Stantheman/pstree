@@ -2,12 +2,12 @@
 package pstree
 
 import (
-	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
-	"regexp"
 )
 
 // ProcessIDs are strings. We don't do math and creation/consumption are guarded with digit globs and digit regexes.
@@ -28,33 +28,38 @@ type ProcessTree map[ProcessID]*Process
 // /proc/pid/stat does not contain information about children -- only parents.
 // Linking children to parents is done in a later pass when we know about every process.
 func (proc *Process) ReadProcessInfo(pid ProcessID) (err error) {
-	fh, err := os.Open("/proc/" + string(pid) + "/stat")
+	filename := "/proc/" + string(pid) + "/stat"
+
+	fh, err := os.Open(filename)
 	if err != nil {
 		return err
 	}
 	defer fh.Close()
 
-	buf := bufio.NewReader(fh)
-	// /proc/pid/stat is one line
-	line, err := buf.ReadString('\n')
+	line, err := ioutil.ReadAll(fh)
 	if err != nil {
 		return err
 	}
 
-	// 25926 (a.out) S 25906 31864 31842 ...
+	// 25926 (annoy me.out) S 25906 31864 31842 ...
 	// 2nd entry is the name in parens, 4th is parent pid
-	re, err := regexp.Compile(`\(([\w\s\/\.:-]+)\)\s[A-Z]\s(\d+)`)
-	if err != nil {
-		return err
+	// get the index of the first and last paren to grab process name
+	first, last := bytes.Index(line, []byte("(")), bytes.LastIndex(line, []byte(")"))
+	if first == -1 || last == -1 {
+		return errors.New("Can't parse " + filename)
 	}
 
-	matches := re.FindStringSubmatch(line)
-	if len(matches) < 3 {
-		return errors.New("Couldn't match on: " + line)
-	}
+	// don't take the parens with us
+	proc.name = string(line[first+1 : last])
 
-	proc.name = matches[1]
-	proc.parent = ProcessID(matches[2])
+	// skip ahead to the rest of the string starting at PPID
+	rest := line[last+4:]
+	last = bytes.IndexByte(rest, ' ')
+	if last == -1 {
+		return errors.New("Can't parse " + filename)
+	}
+	proc.parent = ProcessID(rest[0:last])
+	proc.pid = pid
 
 	return nil
 }
