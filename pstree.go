@@ -1,4 +1,4 @@
-package main
+package pstree
 
 import (
 	"bufio"
@@ -22,19 +22,6 @@ type Process struct {
 
 // ProcessTree is just a convenient world-view of all processes
 type ProcessTree map[ProcessID]*Process
-
-const IndentDepth = 0
-
-func main() {
-	tree := make(ProcessTree)
-
-	if err := tree.Populate(); err != nil {
-		fmt.Errorf("Failed getting proceses: %v\n", err)
-		return
-	}
-
-	tree.PrintDepthFirst("0", IndentDepth)
-}
 
 func (processes ProcessTree) Populate() error {
 	matches, err := filepath.Glob("/proc/[0-9]*")
