@@ -21,7 +21,7 @@ type Process struct {
 	children []ProcessID
 }
 
-// ProcessTree is just a convenient world-view of all processes
+// ProcessTree represents every process on a system.
 type ProcessTree map[ProcessID]*Process
 
 // ReadProcessInfo parses the /proc/pid/stat file to fill the struct.
@@ -62,6 +62,10 @@ func (proc *Process) ReadProcessInfo(pid ProcessID) (err error) {
 // Populate reads the entries in /proc and then assembles the list of children.
 // In order to link parents to children, we must first know every processes's parent.
 func (processes ProcessTree) Populate() error {
+
+	// create pid 0 manually since /proc doesn't expose it, but processes have parents that are pid 0
+	processes["0"] = &Process{"sched", "0", "", nil}
+
 	matches, err := filepath.Glob("/proc/[0-9]*")
 	if err != nil {
 		return err
@@ -76,10 +80,7 @@ func (processes ProcessTree) Populate() error {
 		}
 	}
 
-	// cheat and create pid 0 since /proc doesn't expose it, but processes have parents that are pid 0
-	processes["0"] = &Process{"sched", "0", "", nil}
-
-	// now that we have the list of pids, populate the child list
+	// for every process, add itself to its parent's list of children, now that we know parents
 	for pid, info := range processes {
 		if pid == "0" {
 			continue
