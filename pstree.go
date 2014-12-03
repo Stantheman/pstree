@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 )
 
@@ -22,26 +23,24 @@ type Process struct {
 // ProcessTree represents every process on a system.
 type ProcessTree map[ProcessID]*Process
 
-// make a buffer once for ReadProcessInfo's sake. 256 is approximate size of /proc/pid/stat
-var buf = bytes.NewBuffer(make([]byte, 0, 256))
-
 // ReadProcessInfo parses the /proc/pid/stat file to fill the struct.
 // /proc/pid/stat does not contain information about children -- only parents.
 // Linking children to parents is done in a later pass when we know about every process.
 func (proc *Process) ReadProcessInfo(pid ProcessID) (err error) {
+
 	filename := "/proc/" + string(pid) + "/stat"
 
 	fh, err := os.Open(filename)
 	if err != nil {
 		return err
 	}
-	defer fh.Close()
 
-	if _, err := buf.ReadFrom(fh); err != nil {
+	// 512 being a safe/sloppy upper bound for the size of a stat file
+	var line = make([]byte, 512)
+	if _, err := fh.Read(line); err != io.EOF && err != nil {
 		return err
 	}
-	line := buf.Bytes()
-	buf.Reset()
+	fh.Close()
 
 	// 25926 (annoy me.out) S 25906 31864 31842 ...
 	// 2nd entry is the name in parens, 4th is parent pid
@@ -61,7 +60,7 @@ func (proc *Process) ReadProcessInfo(pid ProcessID) (err error) {
 	if last == -1 {
 		return errors.New("Can't parse " + filename)
 	}
-	proc.parent = ProcessID(rest[0:last])
+	proc.parent = ProcessID(rest[:last])
 	proc.pid = pid
 
 	return nil
