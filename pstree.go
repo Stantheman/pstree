@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 )
 
 // ProcessIDs are strings. We don't do math and creation/consumption are guarded with digit globs and digit regexes.
@@ -73,18 +72,27 @@ func (processes ProcessTree) Populate() error {
 	// create pid 0 manually since /proc doesn't expose it, but processes have parents that are pid 0
 	processes["0"] = &Process{"sched", "0", "", nil}
 
-	matches, err := filepath.Glob("/proc/[0-9]*")
+	procfh, err := os.Open("/proc/")
 	if err != nil {
 		return err
 	}
 
-	for _, pidpath := range matches {
-		pid := ProcessID(filepath.Base(pidpath))
+	entries, err := procfh.Readdirnames(-1)
+	if err != nil {
+		return err
+	}
 
+	for _, entry := range entries {
+		if !isInt(entry) {
+			continue
+		}
+
+		pid := ProcessID(entry)
 		processes[pid] = new(Process)
 		if err := processes[pid].ReadProcessInfo(pid); err != nil {
 			return err
 		}
+
 	}
 
 	// for every process, add itself to its parent's list of children, now that we know parents
@@ -110,4 +118,14 @@ func (pids ProcessTree) PrintDepthFirst(pid ProcessID, depth int) string {
 // String assumes the user wants all processes and is a print-friendly wrapper of PrintDepthFirst
 func (pids ProcessTree) String() string {
 	return pids.PrintDepthFirst("0", 0)
+}
+
+func isInt(in string) bool {
+	for i := 0; i < len(in); i++ {
+		var b byte = in[i]
+		if b < '0' || b > '9' {
+			return false
+		}
+	}
+	return true
 }
