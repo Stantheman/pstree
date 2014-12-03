@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 )
@@ -36,10 +35,12 @@ func (proc *Process) ReadProcessInfo(pid ProcessID) (err error) {
 	}
 	defer fh.Close()
 
-	line, err := ioutil.ReadAll(fh)
-	if err != nil {
+	// start with buffer sized 256, approximate average size of /proc/pid/stat file
+	buf := bytes.NewBuffer(make([]byte, 0, 256))
+	if _, err := buf.ReadFrom(fh); err != nil {
 		return err
 	}
+	line := buf.Bytes()
 
 	// 25926 (annoy me.out) S 25906 31864 31842 ...
 	// 2nd entry is the name in parens, 4th is parent pid
