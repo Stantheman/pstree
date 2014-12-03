@@ -22,6 +22,9 @@ type Process struct {
 // ProcessTree represents every process on a system.
 type ProcessTree map[ProcessID]*Process
 
+// make a buffer once for ReadProcessInfo's sake. 256 is approximate size of /proc/pid/stat
+var buf = bytes.NewBuffer(make([]byte, 0, 256))
+
 // ReadProcessInfo parses the /proc/pid/stat file to fill the struct.
 // /proc/pid/stat does not contain information about children -- only parents.
 // Linking children to parents is done in a later pass when we know about every process.
@@ -34,12 +37,11 @@ func (proc *Process) ReadProcessInfo(pid ProcessID) (err error) {
 	}
 	defer fh.Close()
 
-	// start with buffer sized 256, approximate average size of /proc/pid/stat file
-	buf := bytes.NewBuffer(make([]byte, 0, 256))
 	if _, err := buf.ReadFrom(fh); err != nil {
 		return err
 	}
 	line := buf.Bytes()
+	buf.Reset()
 
 	// 25926 (annoy me.out) S 25906 31864 31842 ...
 	// 2nd entry is the name in parens, 4th is parent pid
