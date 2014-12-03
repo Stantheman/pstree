@@ -109,11 +109,12 @@ func (processes ProcessTree) Populate() error {
 
 // PrintDepthFirst traverses the hash and recursively prints a parent's children.
 func (pids ProcessTree) PrintDepthFirst(pid ProcessID, depth int) string {
-	res := fmt.Sprintf("%*s%v (%v)\n", depth, "", pids[pid].name, pid)
+	buffer := new(bytes.Buffer)
+	fmt.Fprintf(buffer, "%*s%v (%v)\n", depth, "", pids[pid].name, pid)
 	for _, kid := range pids[pid].children {
-		res = res + pids.PrintDepthFirst(kid, depth+1)
+		fmt.Fprintf(buffer, pids.PrintDepthFirst(kid, depth+1))
 	}
-	return res
+	return buffer.String()
 }
 
 // String assumes the user wants all processes and is a print-friendly wrapper of PrintDepthFirst
