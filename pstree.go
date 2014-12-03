@@ -46,7 +46,7 @@ func (proc *Process) ReadProcessInfo(pid ProcessID) (err error) {
 	// 2nd entry is the name in parens, 4th is parent pid
 	// get the index of the first and last paren to grab process name
 	first := bytes.IndexByte(line, '(')
-	last := bytes.IndexByte(line[first:], ')') + first
+	last := bytes.LastIndex(line[:first+17], []byte(")"))
 	if first == -1 || last == -1 {
 		return errors.New("Can't parse " + filename)
 	}
