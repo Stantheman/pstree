@@ -23,6 +23,7 @@ Most changes were small, and all were guided by the help of the pprof tool, incl
  * Replacing the plain old string functions with only calls to IndexByte and some slice hackery
  * Switch to using a plain old buffer instead of ioutil's ReadAll
  * Switch from using a plain old buffer to using read on the filehandle directly
+ * Don't defer the filehandle close if you know you're closing it a few lines later
  * Instead of globbing on /proc/[0-9], using readdir on a proc filehandle
  * Instead of using strconv.Atoi, writing a small isInt helper method to only look at PID directories
 
